@@ -12,7 +12,6 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
@@ -28,7 +27,6 @@ logger = logging.getLogger("server")
 ROOT = Path(__file__).parent
 app = FastAPI(title="Community Capture")
 templates = Jinja2Templates(directory=ROOT / "templates")
-app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 LANDING_BASE_URL = os.environ.get("LANDING_BASE_URL", "http://localhost:8000")
 
