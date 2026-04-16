@@ -1,0 +1,9 @@
+[project]
+name = "community-capture"
+version = "0.1.0"
+description = "Community Capture AI Response Engine — intercept parenting anxiety moments on Reddit and route them into Summer Health consults."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"

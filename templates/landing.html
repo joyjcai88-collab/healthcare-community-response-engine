@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" x-data="landing()" x-init="init()">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talk to a pediatrician — Summer Health</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            summer: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' },
+            ocean: { 50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a' },
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  {% if posthog_key %}
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]);t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('{{ posthog_key }}', {api_host:'{{ posthog_host }}'});
+  </script>
+  {% endif %}
+</head>
+<body class="bg-slate-50 font-sans text-gray-800 min-h-screen">
+  <div class="max-w-md mx-auto px-6 py-16">
+    <div class="flex items-center gap-2 mb-10">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-summer-500 to-ocean-500 flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      </div>
+      <span class="font-bold text-gray-900">Summer Health</span>
+    </div>
+
+    <h1 class="text-3xl font-bold text-gray-900 leading-tight mb-3">
+      Text a pediatrician about your kid — anytime.
+    </h1>
+    <p class="text-base text-gray-600 mb-8">
+      No appointments. No waiting rooms. Real pediatricians answer your questions over text,
+      usually within 15 minutes. $20/month, cancel anytime.
+    </p>
+
+    <div x-show="!submitted" class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your email</label>
+      <input type="email" x-model="email" placeholder="parent@example.com"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-summer-200 mb-3">
+      <button @click="submit()" :disabled="submitting"
+              class="w-full px-4 py-3 bg-summer-600 hover:bg-summer-700 text-white text-sm font-semibold rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-60">
+        <span x-show="!submitting">Get started</span>
+        <span x-show="submitting">Sending…</span>
+      </button>
+      <p class="text-[11px] text-gray-400 mt-3 text-center">
+        We'll email you a sign-up link. By continuing you agree to our terms &amp; privacy policy.
+      </p>
+    </div>
+
+    <div x-show="submitted" x-cloak class="bg-summer-50 border border-summer-200 rounded-2xl p-6 text-center">
+      <div class="w-10 h-10 mx-auto rounded-full bg-summer-100 flex items-center justify-center mb-3">
+        <svg class="w-5 h-5 text-summer-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <p class="font-semibold text-gray-900">Check your inbox.</p>
+      <p class="text-sm text-gray-600 mt-1">We just sent you a sign-up link to <span x-text="email" class="font-medium"></span>.</p>
+    </div>
+
+    <div class="mt-10 grid grid-cols-3 gap-3 text-center">
+      <div>
+        <p class="text-xl font-bold text-summer-600">15min</p>
+        <p class="text-[11px] text-gray-500 mt-1">avg. response</p>
+      </div>
+      <div>
+        <p class="text-xl font-bold text-summer-600">24/7</p>
+        <p class="text-[11px] text-gray-500 mt-1">all hours</p>
+      </div>
+      <div>
+        <p class="text-xl font-bold text-summer-600">$20/mo</p>
+        <p class="text-[11px] text-gray-500 mt-1">cancel anytime</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function landing() {
+      return {
+        email: '',
+        submitted: false,
+        submitting: false,
+        trackingId: null,
+        init() {
+          const params = new URLSearchParams(window.location.search);
+          this.trackingId = params.get('tid');
+          if (window.posthog) {
+            window.posthog.capture('landing_view', {
+              utm_source: params.get('utm_source'),
+              utm_medium: params.get('utm_medium'),
+              utm_campaign: params.get('utm_campaign'),
+              utm_content: params.get('utm_content'),
+              tid: this.trackingId,
+            });
+          }
+        },
+        async submit() {
+          if (!this.email || !this.email.includes('@')) return;
+          this.submitting = true;
+          try {
+            const r = await fetch('/api/track/signup', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ email: this.email, tracking_id: this.trackingId })
+            });
+            if (r.ok) {
+              this.submitted = true;
+              if (window.posthog) window.posthog.capture('signup', { tid: this.trackingId });
+            }
+          } finally { this.submitting = false; }
+        }
+      }
+    }
+  </script>
+</body>
+</html>
