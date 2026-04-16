@@ -12,7 +12,6 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 load_dotenv(override=True)
@@ -26,9 +25,40 @@ logger = logging.getLogger("server")
 
 ROOT = Path(__file__).parent
 app = FastAPI(title="Community Capture")
-templates = Jinja2Templates(directory=ROOT / "templates")
 
 LANDING_BASE_URL = os.environ.get("LANDING_BASE_URL", "http://localhost:8000")
+
+# Load templates as strings at module load time so we don't depend on
+# runtime filesystem access (Vercel's bundler is finicky about non-.py files).
+_TEMPLATES_DIR = ROOT / "templates"
+DASHBOARD_HTML = (_TEMPLATES_DIR / "dashboard.html").read_text()
+LANDING_HTML_RAW = (_TEMPLATES_DIR / "landing.html").read_text()
+
+
+def _render_landing() -> str:
+    posthog_key = os.environ.get("POSTHOG_API_KEY", "")
+    posthog_host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
+    snippet = ""
+    if posthog_key:
+        snippet = (
+            "<script>"
+            "!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(\".\");2==o.length&&(t=t[o[0]],e=o[1]);t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement(\"script\")).type=\"text/javascript\",p.crossOrigin=\"anonymous\",p.async=!0,p.src=s.api_host.replace(\".i.posthog.com\",\"-assets.i.posthog.com\")+\"/static/array.js\",(r=t.getElementsByTagName(\"script\")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a=\"posthog\",u.people=u.people||[],u.toString=function(t){var e=\"posthog\";return\"posthog\"!==a&&(e+=\".\"+a),t||(e+=\" (stub)\"),e},u.people.toString=function(){return u.toString(1)+\".people (stub)\"},o=\"init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug\".split(\" \"),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);"
+            f"posthog.init('{posthog_key}', {{api_host:'{posthog_host}'}});"
+            "</script>"
+        )
+    # Strip the Jinja {% if %} block from the source and inject our snippet
+    # in its place. The raw template still has the block for local dev with
+    # uvicorn — but the deployed path uses this rendered string.
+    import re as _re
+    return _re.sub(
+        r"{%\s*if posthog_key\s*%}.*?{%\s*endif\s*%}",
+        snippet,
+        LANDING_HTML_RAW,
+        flags=_re.DOTALL,
+    )
+
+
+LANDING_HTML = _render_landing()
 
 
 @app.on_event("startup")
@@ -39,14 +69,8 @@ def _startup() -> None:
 # ---------- Dashboard ----------
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "landing_base_url": LANDING_BASE_URL,
-        },
-    )
+def dashboard() -> HTMLResponse:
+    return HTMLResponse(content=DASHBOARD_HTML)
 
 
 # ---------- API: queue + actions ----------
@@ -172,15 +196,8 @@ def go(tracking_id: str, request: Request) -> RedirectResponse:
 # ---------- Landing + conversion ----------
 
 @app.get("/landing", response_class=HTMLResponse)
-def landing(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        "landing.html",
-        {
-            "request": request,
-            "posthog_key": os.environ.get("POSTHOG_API_KEY", ""),
-            "posthog_host": os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com"),
-        },
-    )
+def landing() -> HTMLResponse:
+    return HTMLResponse(content=LANDING_HTML)
 
 
 class SignupBody(BaseModel):
