@@ -105,6 +105,35 @@ def api_ingest_mock(body: MockIngestBody) -> JSONResponse:
     return JSONResponse(summary)
 
 
+@app.get("/api/debug/reddit")
+def api_debug_reddit() -> JSONResponse:
+    """Diagnostic: raw GET to Reddit's JSON listing to see what this region is served."""
+    import httpx
+    ua = os.environ.get(
+        "REDDIT_USER_AGENT",
+        "community-capture/0.1 (read-only research; +https://community-capture.vercel.app)",
+    )
+    url = "https://www.reddit.com/r/NewParents/new.json?limit=5"
+    try:
+        r = httpx.get(url, headers={"User-Agent": ua}, timeout=15.0, follow_redirects=True)
+        body_preview = r.text[:500]
+        try:
+            j = r.json()
+            n_children = len(j.get("data", {}).get("children", []))
+        except Exception:
+            n_children = None
+        return JSONResponse({
+            "status_code": r.status_code,
+            "content_type": r.headers.get("content-type"),
+            "body_len": len(r.text),
+            "n_children": n_children,
+            "body_preview": body_preview,
+            "ua_sent": ua,
+        })
+    except Exception as exc:
+        return JSONResponse({"error": repr(exc), "ua_sent": ua}, status_code=500)
+
+
 @app.get("/api/ingest/reddit")
 def api_ingest_reddit(request: Request) -> JSONResponse:
     """Pull recent posts from configured subreddits. Invoked by Vercel Cron.
