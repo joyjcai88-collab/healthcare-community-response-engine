@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 load_dotenv(override=True)
 
 import database as db
+from ingest.runner import run_mock
 from responder.generator import generate
 from responder.safety import check
 
@@ -83,6 +84,25 @@ def api_queue(status: str = "pending", limit: int = 100) -> JSONResponse:
 @app.get("/api/metrics")
 def api_metrics() -> JSONResponse:
     return JSONResponse(db.funnel_metrics())
+
+
+class MockIngestBody(BaseModel):
+    n: int = Field(default=1, ge=1, le=5)
+    draft: bool = True
+
+
+@app.post("/api/ingest/mock")
+def api_ingest_mock(body: MockIngestBody) -> JSONResponse:
+    """Seed 1-5 synthetic parenting posts (with Claude drafts).
+
+    Useful for demos / pitches when you don't have Reddit creds, or to
+    generate fresh content on-demand during a live walkthrough.
+    """
+    try:
+        summary = run_mock(n=body.n, draft=body.draft)
+    except Exception as exc:
+        raise HTTPException(500, f"mock ingest failed: {exc}")
+    return JSONResponse(summary)
 
 
 class ApproveBody(BaseModel):

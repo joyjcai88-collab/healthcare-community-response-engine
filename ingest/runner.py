@@ -1,4 +1,4 @@
-"""CLI runner: pull recent Reddit posts, classify, and store qualifying rows."""
+"""CLI runner: pull posts (real Reddit or mock), classify, draft, store."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Iterable, List
 
 # Make project root importable when invoked as `python -m ingest.runner`.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -15,34 +16,32 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from database import init_db, upsert_post  # noqa: E402
-from ingest import reddit_client  # noqa: E402
+from database import init_db, insert_draft, upsert_post  # noqa: E402
+from ingest import mock as mock_source  # noqa: E402
 from ingest.classifier import classify, keyword_match  # noqa: E402
 from responder.generator import generate  # noqa: E402
 from responder.safety import check  # noqa: E402
-from database import insert_draft  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("ingest.runner")
 
 
-def run(once: bool = True, draft: bool = True) -> int:
+def ingest_records(
+    records: Iterable[dict],
+    draft: bool = True,
+    require_keywords: bool = True,
+) -> dict:
+    """Shared pipeline: classify → store → draft → safety-check.
+
+    Returns a summary dict. Used by both the CLI and the /api/ingest/mock
+    endpoint so they behave identically.
+    """
     init_db()
-
-    subreddits = [
-        s.strip()
-        for s in os.environ.get(
-            "SUBREDDITS", "Parenting,NewParents,beyondthebump"
-        ).split(",")
-        if s.strip()
-    ]
-    lookback = int(os.environ.get("INGEST_LOOKBACK_HOURS", "6"))
-
-    n_seen = n_kept = n_drafts = 0
-    for record in reddit_client.pull_recent(subreddits, lookback_hours=lookback):
-        n_seen += 1
+    seen = kept = drafts = 0
+    for record in records:
+        seen += 1
         body = f"{record.get('title','')}\n\n{record.get('text','')}"
-        if not keyword_match(body):
+        if require_keywords and not keyword_match(body):
             continue
 
         scoring = classify(record.get("text", ""), record.get("title", ""))
@@ -51,10 +50,10 @@ def run(once: bool = True, draft: bool = True) -> int:
         post_id = upsert_post(record)
         if post_id is None:
             continue
-        n_kept += 1
+        kept += 1
         logger.info(
             "Stored post id=%s urgency=%.2f topic=%s sub=%s",
-            post_id, scoring["urgency_score"], scoring["topic"], record["subreddit"],
+            post_id, scoring["urgency_score"], scoring["topic"], record.get("subreddit"),
         )
 
         if draft:
@@ -74,24 +73,49 @@ def run(once: bool = True, draft: bool = True) -> int:
                     safety_passed=safety["passed"],
                     safety_violations=safety["violations"],
                 )
-                n_drafts += 1
+                drafts += 1
             except Exception as exc:
                 logger.warning("Draft generation failed for post %s: %s", post_id, exc)
 
-    logger.info("Done. seen=%d kept=%d drafts=%d", n_seen, n_kept, n_drafts)
-    return n_kept
+    return {"seen": seen, "kept": kept, "drafts": drafts}
+
+
+def run_reddit(draft: bool = True) -> dict:
+    from ingest import reddit_client
+
+    subreddits = [
+        s.strip()
+        for s in os.environ.get(
+            "SUBREDDITS", "Parenting,NewParents,beyondthebump"
+        ).split(",")
+        if s.strip()
+    ]
+    lookback = int(os.environ.get("INGEST_LOOKBACK_HOURS", "6"))
+    return ingest_records(
+        reddit_client.pull_recent(subreddits, lookback_hours=lookback),
+        draft=draft,
+    )
+
+
+def run_mock(n: int = 3, draft: bool = True) -> dict:
+    return ingest_records(mock_source.pull_n(n), draft=draft, require_keywords=False)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--once", action="store_true", default=True)
-    parser.add_argument(
-        "--no-draft",
-        action="store_true",
-        help="Skip LLM draft generation (just ingest + classify).",
-    )
+    parser.add_argument("--mock", action="store_true",
+                        help="Use the built-in mock post source (no Reddit API needed).")
+    parser.add_argument("--n", type=int, default=3,
+                        help="How many mock posts to pull per run (only with --mock).")
+    parser.add_argument("--no-draft", action="store_true",
+                        help="Skip LLM draft generation.")
     args = parser.parse_args()
-    run(once=args.once, draft=not args.no_draft)
+
+    if args.mock:
+        summary = run_mock(n=args.n, draft=not args.no_draft)
+    else:
+        summary = run_reddit(draft=not args.no_draft)
+    logger.info("Done. %s", summary)
 
 
 if __name__ == "__main__":

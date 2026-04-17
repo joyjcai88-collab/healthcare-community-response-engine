@@ -90,6 +90,12 @@
             <p class="text-sm font-bold leading-tight" x-text="m.value"></p>
           </div>
         </template>
+
+        <button @click="seedDemoPost()" :disabled="seeding"
+                class="ml-2 px-3 py-1.5 bg-reddit-500 hover:bg-reddit-600 disabled:opacity-60 text-white rounded-full text-[11px] font-bold uppercase tracking-wide">
+          <span x-show="!seeding">+ Seed demo post</span>
+          <span x-show="seeding">Seeding…</span>
+        </button>
       </div>
     </div>
   </header>
@@ -245,6 +251,7 @@
         editedText: '',
         steeringNote: '',
         loading: false,
+        seeding: false,
         statusFilter: 'pending',
         searchQuery: '',
         lastApproved: null,
@@ -321,6 +328,24 @@
           this.notify('success','Rejected','');
           this.selected = null;
           await this.refreshAll();
+        },
+
+        async seedDemoPost() {
+          this.seeding = true;
+          this.notify('info','Seeding…','Generating a fresh post + Claude draft');
+          try {
+            const r = await fetch('/api/ingest/mock', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ n: 1, draft: true })
+            });
+            if (!r.ok) throw new Error();
+            const summary = await r.json();
+            this.statusFilter = 'pending';
+            await this.refreshAll();
+            this.notify('success','New post in queue',`Drafts generated: ${summary.drafts}`);
+          } catch {
+            this.notify('error','Seed failed','Check server logs');
+          } finally { this.seeding = false; }
         },
 
         async regenerate() {
