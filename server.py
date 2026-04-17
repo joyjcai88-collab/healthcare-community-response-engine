@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 load_dotenv(override=True)
 
 import database as db
-from ingest.runner import run_mock
+from ingest.runner import run_mock, run_reddit
 from responder.generator import generate
 from responder.safety import check
 
@@ -102,6 +102,26 @@ def api_ingest_mock(body: MockIngestBody) -> JSONResponse:
         summary = run_mock(n=body.n, draft=body.draft)
     except Exception as exc:
         raise HTTPException(500, f"mock ingest failed: {exc}")
+    return JSONResponse(summary)
+
+
+@app.get("/api/ingest/reddit")
+def api_ingest_reddit(request: Request) -> JSONResponse:
+    """Pull recent posts from configured subreddits. Invoked by Vercel Cron.
+
+    Protected by `Authorization: Bearer $CRON_SECRET` when the env var is set
+    (Vercel Cron sends this header automatically). Open otherwise, so local
+    dev calls still work.
+    """
+    cron_secret = os.environ.get("CRON_SECRET")
+    if cron_secret:
+        auth = request.headers.get("authorization", "")
+        if auth != f"Bearer {cron_secret}":
+            raise HTTPException(401, "unauthorized")
+    try:
+        summary = run_reddit(draft=True)
+    except Exception as exc:
+        raise HTTPException(500, f"reddit ingest failed: {exc}")
     return JSONResponse(summary)
 
 

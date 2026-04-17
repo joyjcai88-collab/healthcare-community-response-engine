@@ -1,3 +1,9 @@
 {
-  "framework": "fastapi"
+  "framework": "fastapi",
+  "crons": [
+    {
+      "path": "/api/ingest/reddit",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }
