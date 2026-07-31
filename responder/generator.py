@@ -11,7 +11,7 @@ from .prompts import FEW_SHOTS, PROMPT_VERSION, SYSTEM, build_user_prompt, pick_
 
 logger = logging.getLogger(__name__)
 
-OPUS_MODEL = "claude-opus-4-6"
+OPUS_MODEL = "claude-opus-5"
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 
